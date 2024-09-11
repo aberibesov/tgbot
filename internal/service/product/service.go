@@ -1,5 +1,11 @@
 package product
 
+import (
+	"encoding/xml"
+	"fmt"
+	"github.com/aberibesov/tgbot/internal/api/wipline"
+)
+
 type Service struct {
 }
 
@@ -33,4 +39,34 @@ func (s *Service) Delete(idx int) error {
 func (s *Service) Update(idx int, newTitle string) (*Product, error) {
 	allProducts[idx].Title = newTitle
 	return &allProducts[idx], nil
+}
+
+func (s *Service) GetInfo(ls int) (*Response, error) {
+
+	xmlReq, errEnc := xml.Marshal(Request{"getuserinfo", ls})
+
+	if errEnc != nil {
+		fmt.Println("Error:", errEnc)
+		return nil, errEnc
+	}
+
+	body, errReq := wipline.ApiRequest(xmlReq)
+
+	if errReq != nil {
+		fmt.Println("Error:", errReq)
+		return nil, errReq
+	}
+
+	// Создаем переменную для хранения данных
+	users := Response{}
+
+	// Парсинг XML
+	errParse := xml.Unmarshal(body, &users)
+
+	if errParse != nil {
+		fmt.Println("Error:", errParse)
+		return nil, errParse
+	}
+
+	return &users, nil
 }

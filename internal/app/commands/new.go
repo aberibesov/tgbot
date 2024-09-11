@@ -5,14 +5,14 @@ import (
 	"log"
 )
 
-func (c *Commander) New(inputMessage *tgbotapi.Message) {
+func (c *Commander) New(inputMessage *tgbotapi.Message, settings *UserSettings) {
 	msgText := ""
-	if c.waitNew {
+	if settings.WaitNew {
 		msgText += "Добавлен новый элемент: " + inputMessage.Text
 		c.ProductService.Add(inputMessage.Text)
-		c.waitNew = false
+		settings.WaitNew = false
 	} else {
-		c.waitNew = true
+		settings.WaitNew = true
 		msgText += "Введите название продукта:"
 	}
 
@@ -24,5 +24,4 @@ func (c *Commander) New(inputMessage *tgbotapi.Message) {
 	if err != nil {
 		log.Println("Ошибка при отправке сообщения:", err)
 	}
-
 }

@@ -11,7 +11,3 @@ var allProducts = []Product{
 type Product struct {
 	Title string `json:"title"`
 }
-
-func NewProduct() *Product {
-	return &Product{}
-}

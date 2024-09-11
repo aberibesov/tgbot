@@ -9,23 +9,31 @@ import (
 
 //var registeredCommands = map[string]func(c *Commander, msg *tgbotapi.Message){}
 
+type UserSettings struct {
+	WaitNew       bool
+	UpdateIdx     int
+	ConfirmDelete bool
+	WaitLS        bool
+}
+
 type Commander struct {
 	Bot            *tgbotapi.BotAPI
 	ProductService *product.Service
-	waitNew        bool
-	updateIdx      int
-	confirmDelete  bool
+	MapUsers       map[int64]UserSettings
 }
 
-func (c *Commander) resetFlags(exclude string) {
+func (c *Commander) resetUserFlags(settings *UserSettings, exclude string) {
 	if exclude != "waitNew" {
-		c.waitNew = false
+		settings.WaitNew = false
 	}
 	if exclude != "confirmDelete" {
-		c.confirmDelete = false
+		settings.ConfirmDelete = false
 	}
 	if exclude != "updateIdx" {
-		c.updateIdx = -1
+		settings.UpdateIdx = -1
+	}
+	if exclude != "waitLS" {
+		settings.WaitLS = false
 	}
 }
 
@@ -38,7 +46,7 @@ func NewCommander(bot *tgbotapi.BotAPI, productService *product.Service) *Comman
 	return &Commander{
 		Bot:            bot,
 		ProductService: productService,
-		updateIdx:      -1,
+		MapUsers:       make(map[int64]UserSettings),
 	}
 }
 
@@ -52,29 +60,35 @@ func (c *Commander) HandleUpdate(update tgbotapi.Update) {
 	if update.CallbackQuery != nil {
 		parsedData := commandData{}
 		json.Unmarshal([]byte(update.CallbackQuery.Data), &parsedData)
-
+		userSettings := c.MapUsers[update.CallbackQuery.From.ID]
 		switch parsedData.Command {
 		case "new":
-			c.New(update.CallbackQuery.Message)
+			c.New(update.CallbackQuery.Message, &userSettings)
 		case "edit":
-			c.Edit(update.CallbackQuery.Message, parsedData.Idx)
+			c.Edit(update.CallbackQuery.Message, &userSettings, parsedData.Idx)
 		case "confirm":
-			c.confirmDelete = true
-			c.Delete(update.CallbackQuery.Message, parsedData.Idx)
+			userSettings.ConfirmDelete = true
+			c.Delete(update.CallbackQuery.Message, &userSettings, parsedData.Idx)
 		case "delete":
-			c.Delete(update.CallbackQuery.Message, parsedData.Idx)
+			c.Delete(update.CallbackQuery.Message, &userSettings, parsedData.Idx)
 		case "cancel":
-			c.resetFlags("")
+			c.resetUserFlags(&userSettings, "")
 			c.List(update.CallbackQuery.Message)
 		default:
-			c.resetFlags("")
+			c.resetUserFlags(&userSettings, "")
 			c.Default(update.CallbackQuery.Message)
 		}
+		c.MapUsers[update.CallbackQuery.From.ID] = userSettings
 		return
 	}
 
 	if update.Message == nil {
 		return
+	}
+
+	_, exists := c.MapUsers[update.Message.From.ID]
+	if !exists {
+		c.MapUsers[update.Message.From.ID] = UserSettings{UpdateIdx: -1}
 	}
 
 	/*command, ok := registeredCommands[update.Message.Command()]
@@ -84,33 +98,38 @@ func (c *Commander) HandleUpdate(update tgbotapi.Update) {
 		c.Default(update.Message)
 	}
 	*/
-	if update.Message != nil { // If we got a message
-		switch update.Message.Command() {
-		case "help":
-			c.waitNew = false
-			c.Help(update.Message)
-		case "list":
-			c.waitNew = false
-			c.List(update.Message)
-		case "get":
-			c.waitNew = false
-			c.Get(update.Message)
-		case "new":
-			c.New(update.Message)
-		case "delete":
-			c.waitNew = false
-			c.Delete(update.Message, 0)
-		case "edit":
-			c.waitNew = false
-			c.Edit(update.Message, 0)
-		default:
-			if c.waitNew {
-				c.New(update.Message)
-			} else if c.updateIdx >= 0 {
-				c.Edit(update.Message, c.updateIdx)
-			} else {
-				c.Default(update.Message)
-			}
+	// If we got a message
+	userSettings := c.MapUsers[update.Message.From.ID]
+	switch update.Message.Command() {
+	case "help":
+		userSettings.WaitNew = false
+		c.Help(update.Message)
+	case "list":
+		userSettings.WaitNew = false
+		c.List(update.Message)
+	case "get":
+		userSettings.WaitNew = false
+		c.Get(update.Message)
+	case "new":
+		c.New(update.Message, &userSettings)
+	case "delete":
+		userSettings.WaitNew = false
+		c.Delete(update.Message, &userSettings, -1)
+	case "edit":
+		userSettings.WaitNew = false
+		c.Edit(update.Message, &userSettings, -1)
+	case "info":
+		c.Info(update.Message)
+	default:
+		if userSettings.WaitNew {
+			c.New(update.Message, &userSettings)
+		} else if userSettings.WaitLS {
+			c.Info(update.Message)
+		} else if userSettings.UpdateIdx >= 0 {
+			c.Edit(update.Message, &userSettings, userSettings.UpdateIdx)
+		} else {
+			c.Default(update.Message)
 		}
 	}
+	c.MapUsers[update.Message.From.ID] = userSettings
 }

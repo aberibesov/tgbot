@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func (c *Commander) Edit(inputMessage *tgbotapi.Message, idx int) {
+func (c *Commander) Edit(inputMessage *tgbotapi.Message, settings *UserSettings, idx int) {
 	msgText := ""
 
 	product, err := c.ProductService.Get(idx)
@@ -14,13 +14,13 @@ func (c *Commander) Edit(inputMessage *tgbotapi.Message, idx int) {
 		return
 	}
 
-	if c.updateIdx >= 0 {
+	if settings.UpdateIdx >= 0 {
 		msgText += product.Title + " изменен на " + inputMessage.Text
-		c.ProductService.Update(c.updateIdx, inputMessage.Text)
-		c.updateIdx = -1
+		c.ProductService.Update(settings.UpdateIdx, inputMessage.Text)
+		settings.UpdateIdx = -1
 	} else {
 		msgText += "Введите новое значение для " + product.Title
-		c.updateIdx = idx
+		settings.UpdateIdx = idx
 	}
 
 	msg := tgbotapi.NewMessage(inputMessage.Chat.ID,

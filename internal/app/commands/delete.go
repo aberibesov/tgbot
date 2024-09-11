@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-func (c *Commander) Delete(inputMessage *tgbotapi.Message, idx int) {
+func (c *Commander) Delete(inputMessage *tgbotapi.Message, settings *UserSettings, idx int) {
 	msgText := ""
 
 	product, err := c.ProductService.Get(idx)
@@ -18,15 +18,15 @@ func (c *Commander) Delete(inputMessage *tgbotapi.Message, idx int) {
 	serializedComConfirm := []byte{}
 	serializedComCancel := []byte{}
 
-	if c.confirmDelete {
+	if settings.ConfirmDelete {
 		msgText += "Удален элемент:" + product.Title
 		c.ProductService.Delete(idx)
-		c.confirmDelete = false
+		settings.ConfirmDelete = false
 	} else {
 		msgText += "Уверены, что хотите удалить элемент: " + product.Title
 		serializedComConfirm, _ = json.Marshal(commandData{"confirm", idx})
 		serializedComCancel, _ = json.Marshal(commandData{"cancel", idx})
-		c.confirmDelete = false
+		settings.ConfirmDelete = false
 	}
 
 	msg := tgbotapi.NewMessage(inputMessage.Chat.ID,
