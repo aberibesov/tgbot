@@ -7,12 +7,13 @@ import (
 
 func (c *Commander) New(inputMessage *tgbotapi.Message, settings *UserSettings) {
 	msgText := ""
-	if settings.WaitNew {
+	if settings.Step == 1 {
 		msgText += "Добавлен новый элемент: " + inputMessage.Text
 		c.ProductService.Add(inputMessage.Text)
-		settings.WaitNew = false
+		settings.Step = 0
+		settings.State = Default
 	} else {
-		settings.WaitNew = true
+		settings.Step = 1
 		msgText += "Введите название продукта:"
 	}
 

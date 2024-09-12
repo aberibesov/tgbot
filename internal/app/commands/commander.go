@@ -9,32 +9,28 @@ import (
 
 //var registeredCommands = map[string]func(c *Commander, msg *tgbotapi.Message){}
 
+type State int
+
+const (
+	New State = iota
+	List
+	Edit
+	Delete
+	Info
+	Get
+	Default
+)
+
 type UserSettings struct {
-	WaitNew       bool
-	UpdateIdx     int
-	ConfirmDelete bool
-	WaitLS        bool
+	State State
+	Step  int
+	Idx   int
 }
 
 type Commander struct {
 	Bot            *tgbotapi.BotAPI
 	ProductService *product.Service
 	MapUsers       map[int64]UserSettings
-}
-
-func (c *Commander) resetUserFlags(settings *UserSettings, exclude string) {
-	if exclude != "waitNew" {
-		settings.WaitNew = false
-	}
-	if exclude != "confirmDelete" {
-		settings.ConfirmDelete = false
-	}
-	if exclude != "updateIdx" {
-		settings.UpdateIdx = -1
-	}
-	if exclude != "waitLS" {
-		settings.WaitLS = false
-	}
 }
 
 type commandData struct {
@@ -63,19 +59,22 @@ func (c *Commander) HandleUpdate(update tgbotapi.Update) {
 		userSettings := c.MapUsers[update.CallbackQuery.From.ID]
 		switch parsedData.Command {
 		case "new":
+			userSettings.State = New
 			c.New(update.CallbackQuery.Message, &userSettings)
 		case "edit":
+			userSettings.State = Edit
 			c.Edit(update.CallbackQuery.Message, &userSettings, parsedData.Idx)
 		case "confirm":
-			userSettings.ConfirmDelete = true
+			userSettings.State = Delete
+			userSettings.Step = 1
 			c.Delete(update.CallbackQuery.Message, &userSettings, parsedData.Idx)
 		case "delete":
+			userSettings.State = Delete
 			c.Delete(update.CallbackQuery.Message, &userSettings, parsedData.Idx)
 		case "cancel":
-			c.resetUserFlags(&userSettings, "")
+			userSettings.State = Delete
 			c.List(update.CallbackQuery.Message)
 		default:
-			c.resetUserFlags(&userSettings, "")
 			c.Default(update.CallbackQuery.Message)
 		}
 		c.MapUsers[update.CallbackQuery.From.ID] = userSettings
@@ -88,7 +87,7 @@ func (c *Commander) HandleUpdate(update tgbotapi.Update) {
 
 	_, exists := c.MapUsers[update.Message.From.ID]
 	if !exists {
-		c.MapUsers[update.Message.From.ID] = UserSettings{UpdateIdx: -1}
+		c.MapUsers[update.Message.From.ID] = UserSettings{Idx: -1}
 	}
 
 	/*command, ok := registeredCommands[update.Message.Command()]
@@ -102,32 +101,35 @@ func (c *Commander) HandleUpdate(update tgbotapi.Update) {
 	userSettings := c.MapUsers[update.Message.From.ID]
 	switch update.Message.Command() {
 	case "help":
-		userSettings.WaitNew = false
+		userSettings.State = Default
 		c.Help(update.Message)
 	case "list":
-		userSettings.WaitNew = false
+		userSettings.State = List
 		c.List(update.Message)
 	case "get":
-		userSettings.WaitNew = false
+		userSettings.State = Get
 		c.Get(update.Message)
 	case "new":
+		userSettings.State = New
 		c.New(update.Message, &userSettings)
 	case "delete":
-		userSettings.WaitNew = false
+		userSettings.State = Delete
 		c.Delete(update.Message, &userSettings, -1)
 	case "edit":
-		userSettings.WaitNew = false
+		userSettings.State = Edit
 		c.Edit(update.Message, &userSettings, -1)
 	case "info":
-		c.Info(update.Message)
+		userSettings.State = Info
+		c.Info(update.Message, &userSettings)
 	default:
-		if userSettings.WaitNew {
+		switch userSettings.State {
+		case New:
 			c.New(update.Message, &userSettings)
-		} else if userSettings.WaitLS {
-			c.Info(update.Message)
-		} else if userSettings.UpdateIdx >= 0 {
-			c.Edit(update.Message, &userSettings, userSettings.UpdateIdx)
-		} else {
+		case Edit:
+			c.Edit(update.Message, &userSettings, userSettings.Idx)
+		case Info:
+			c.Info(update.Message, &userSettings)
+		default:
 			c.Default(update.Message)
 		}
 	}

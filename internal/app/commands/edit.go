@@ -14,13 +14,16 @@ func (c *Commander) Edit(inputMessage *tgbotapi.Message, settings *UserSettings,
 		return
 	}
 
-	if settings.UpdateIdx >= 0 {
+	if settings.Idx >= 0 && settings.Step == 1 {
 		msgText += product.Title + " изменен на " + inputMessage.Text
-		c.ProductService.Update(settings.UpdateIdx, inputMessage.Text)
-		settings.UpdateIdx = -1
+		c.ProductService.Update(settings.Idx, inputMessage.Text)
+		settings.Idx = -1
+		settings.Step = 0
+		settings.State = Default
 	} else {
 		msgText += "Введите новое значение для " + product.Title
-		settings.UpdateIdx = idx
+		settings.Idx = idx
+		settings.Step = 1
 	}
 
 	msg := tgbotapi.NewMessage(inputMessage.Chat.ID,

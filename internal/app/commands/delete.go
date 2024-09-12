@@ -18,15 +18,15 @@ func (c *Commander) Delete(inputMessage *tgbotapi.Message, settings *UserSetting
 	serializedComConfirm := []byte{}
 	serializedComCancel := []byte{}
 
-	if settings.ConfirmDelete {
+	if settings.Step == 1 {
 		msgText += "Удален элемент:" + product.Title
 		c.ProductService.Delete(idx)
-		settings.ConfirmDelete = false
+		settings.Step = 0
+		settings.State = Default
 	} else {
 		msgText += "Уверены, что хотите удалить элемент: " + product.Title
 		serializedComConfirm, _ = json.Marshal(commandData{"confirm", idx})
 		serializedComCancel, _ = json.Marshal(commandData{"cancel", idx})
-		settings.ConfirmDelete = false
 	}
 
 	msg := tgbotapi.NewMessage(inputMessage.Chat.ID,

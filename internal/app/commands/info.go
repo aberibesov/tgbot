@@ -8,34 +8,34 @@ import (
 	"strconv"
 )
 
-func (c *Commander) Info(inputMessage *tgbotapi.Message) {
-	userSettings := c.MapUsers[inputMessage.From.ID]
-	if userSettings.WaitLS {
-		c.handleWaitingForLS(inputMessage)
+func (c *Commander) Info(inputMessage *tgbotapi.Message, settings *UserSettings) {
+	if settings.Step == 1 {
+		c.handleWaitingForLS(inputMessage, settings)
 	} else {
 		args := inputMessage.CommandArguments()
 
 		ls, err := strconv.Atoi(args)
 
 		if ls > 0 && err == nil {
-			c.sendRequestByLs(inputMessage, ls)
+			c.sendRequestByLs(inputMessage, ls, settings)
 			return
 		}
+		settings.Step = 1
 		c.promptForClientAccount(inputMessage)
 	}
 }
 
-func (c *Commander) handleWaitingForLS(inputMessage *tgbotapi.Message) {
+func (c *Commander) handleWaitingForLS(inputMessage *tgbotapi.Message, settings *UserSettings) {
 	ls, err := strconv.Atoi(inputMessage.Text)
 	if err != nil {
 		c.sendMessage(inputMessage.Chat.ID, "Лицевой счет должен содержать только цифры")
 		return
 	}
 
-	c.sendRequestByLs(inputMessage, ls)
+	c.sendRequestByLs(inputMessage, ls, settings)
 }
 
-func (c *Commander) sendRequestByLs(inputMessage *tgbotapi.Message, ls int) {
+func (c *Commander) sendRequestByLs(inputMessage *tgbotapi.Message, ls int, settings *UserSettings) {
 	response, err := c.ProductService.GetInfo(ls)
 	if err != nil {
 		log.Println(err)
@@ -43,18 +43,13 @@ func (c *Commander) sendRequestByLs(inputMessage *tgbotapi.Message, ls int) {
 		return
 	}
 
+	settings.Step = 0
+	settings.State = Default
 	msgText := c.formatClientInfo(response)
 	c.sendMessage(inputMessage.Chat.ID, msgText)
-
-	userSettings := c.MapUsers[inputMessage.From.ID]
-	userSettings.WaitLS = false
-	c.MapUsers[inputMessage.From.ID] = userSettings
 }
 
 func (c *Commander) promptForClientAccount(inputMessage *tgbotapi.Message) {
-	userSettings := c.MapUsers[inputMessage.From.ID]
-	userSettings.WaitLS = true
-	c.MapUsers[inputMessage.From.ID] = userSettings
 	c.sendMessage(inputMessage.Chat.ID, "Введите лицевой счет клиента:")
 }
 
